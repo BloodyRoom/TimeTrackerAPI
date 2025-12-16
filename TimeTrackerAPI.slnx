@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Core/Core.csproj" Id="5392eff0-04d7-4e85-a814-cf83e70b85a9" />
+  <Project Path="Domain/Domain.csproj" Id="756bd46e-ac55-41ea-a08a-046093231304" />
+  <Project Path="TimeTrackerAPI/TimeTrackerAPI.csproj" />
+</Solution>
