@@ -13,4 +13,5 @@ public class TrackerDBContext : DbContext
 
     public DbSet<UserEntity> Users { get; set; } 
     public DbSet<RefreshTokenEntity> RefreshTokens { get; set; } 
+    public DbSet<TimeSessionEntity> TimeSessions { get; set; }
 }

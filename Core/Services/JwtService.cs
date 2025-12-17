@@ -12,18 +12,12 @@ using System.Text;
 
 namespace Core.Services;
 
-public class JwtService : IJwtService
+public class JwtService(
+    TrackerDBContext _db, 
+    IConfiguration configuration, 
+    IMapper _mapper ) : IJwtService
 {
-    private readonly string _key;
-    private readonly TrackerDBContext _db;
-    private readonly IMapper _mapper;
-
-    public JwtService(IConfiguration configuration, TrackerDBContext db, IMapper mapper)
-    {
-        _key = configuration["Jwt:Key"] ?? "";
-        _db = db;
-        _mapper = mapper;
-    }
+    private readonly string _key = configuration["Jwt:Key"] ?? "";
 
     public string CreateAccessToken(UserModel user)
     {
