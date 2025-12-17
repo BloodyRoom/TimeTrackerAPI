@@ -76,5 +76,21 @@ namespace TimeTrackerAPI.Controllers
             var tokens = await _jwt.IssueTokens(user);
             return Ok(tokens);
         }
+
+
+        [HttpPost("Logout")]
+        public async Task<IActionResult> Logout(LogoutRequest request)
+        {
+            var token = await _db.RefreshTokens
+                .FirstOrDefaultAsync(t => t.Token == request.RefreshToken);
+
+            if (token == null)
+                return Ok();
+
+            token.IsRevoked = true;
+            await _db.SaveChangesAsync();
+
+            return Ok();
+        }
     }
 }
