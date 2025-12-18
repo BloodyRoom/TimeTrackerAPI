@@ -15,7 +15,7 @@ public enum SessionStatus
 public class TimeSessionEntity : BaseEntity<int>
 {
     public int UserId { get; set; }
-    public UserEntity User { get; set; }
+    public UserEntity User { get; set; } = new UserEntity(); 
 
     public DateTime StartTime { get; set; }
     public DateTime? EndTime { get; set; }
