@@ -1,4 +1,5 @@
 ﻿using Core.Helpers;
+using Core.Models.TimeStatistic;
 using Domain;
 using Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
@@ -24,6 +25,65 @@ public class SessionController(
 
         return Ok(active);
     }
+
+    [HttpGet("Statistic/Day")]
+    public async Task<IActionResult> Day()
+    {
+        int userId = User.GetUserId();
+
+        var from = DateTime.UtcNow.Date;
+        var to = from.AddDays(1);
+
+        return Ok(await GetStatistic(userId, from, to, false));
+    }
+
+    [HttpGet("Statistic/Week")]
+    public async Task<IActionResult> Week()
+    {
+        int userId = User.GetUserId();
+
+        var to = DateTime.UtcNow.Date.AddDays(1);
+        var from = to.AddDays(-7);
+
+        return Ok(await GetStatistic(userId, from, to, false));
+    }
+
+    [HttpGet("Statistic/Month")]
+    public async Task<IActionResult> Month()
+    {
+        int userId = User.GetUserId();
+        var now = DateTime.UtcNow;
+
+        var from = new DateTime(
+            now.Year,
+            now.Month,
+            1,
+            0, 0, 0,
+            DateTimeKind.Utc);
+
+        var to = from.AddMonths(1);
+
+        return Ok(await GetStatistic(userId, from, to, false));
+    }
+
+    [HttpGet("Statistic/Year")]
+    public async Task<IActionResult> Year()
+    {
+        int userId = User.GetUserId();
+        var now = DateTime.UtcNow;
+
+        var from = new DateTime(
+            now.Year,
+            1,
+            1,
+            0, 0, 0,
+            DateTimeKind.Utc);
+
+        var to = from.AddYears(1);
+
+        return Ok(await GetStatistic(userId, from, to, true));
+    }
+
 
 
     [HttpPost("Start")]
@@ -124,4 +184,54 @@ public class SessionController(
         return Ok(session);
     }
 
+
+    private async Task<TimeStatisticResponse> GetStatistic(
+        int userId,
+        DateTime from,
+        DateTime to,
+        bool groupByMonth)
+    {
+        from = DateTime.SpecifyKind(from, DateTimeKind.Utc);
+        to = DateTime.SpecifyKind(to, DateTimeKind.Utc);
+
+        var sessions = await _db.TimeSessions
+            .Where(s =>
+                s.UserId == userId &&
+                s.Status == SessionStatus.Stopped &&
+                s.EndTime >= from &&
+                s.EndTime < to)
+            .ToListAsync();
+
+        var items = groupByMonth
+            ? sessions
+                .GroupBy(s => new DateTime(
+                    s.EndTime!.Value.Year,
+                    s.EndTime.Value.Month,
+                    1,
+                    0, 0, 0,
+                    DateTimeKind.Utc))
+                .Select(g => new TimeStatisticItem
+                {
+                    Date = g.Key,
+                    TotalSeconds = g.Sum(x => x.DurationSeconds)
+                })
+                .OrderBy(x => x.Date)
+                .ToList()
+            : sessions
+                .GroupBy(s => s.EndTime!.Value.Date)
+                .Select(g => new TimeStatisticItem
+                {
+                    Date = DateTime.SpecifyKind(g.Key, DateTimeKind.Utc),
+                    TotalSeconds = g.Sum(x => x.DurationSeconds)
+                })
+                .OrderBy(x => x.Date)
+                .ToList();
+
+        return new TimeStatisticResponse    
+        {
+            TotalSeconds = sessions.Sum(s => s.DurationSeconds),
+            SessionsCount = sessions.Count,
+            Items = items
+        };
+    }
 }
