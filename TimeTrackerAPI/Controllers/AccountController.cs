@@ -4,23 +4,35 @@ using Core.Models.User;
 using Domain;
 using Domain.Entities;
 using Google.Apis.Auth;
-using Microsoft.AspNetCore.Http;
+using Google.Apis.Auth.OAuth2.Responses;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Net.Http.Headers;
 
 namespace TimeTrackerAPI.Controllers
 {
+    /// <summary>
+    /// Авторизація та управління акаунтом користувача
+    /// </summary>
+    /// <remarks>
+    /// Включає:
+    /// - реєстрацію користувача
+    /// - логін по email/password
+    /// - логін через Google
+    /// - logout (revocation refresh token)
+    /// </remarks>
     [ApiController]
+    [Tags("Auth")]
     [Route("api/[controller]")]
     public class AccountController(
-        TrackerDBContext _db, 
+        TrackerDBContext _db,
         IJwtService _jwt,
         IMapper mapper) : ControllerBase
     {
-
         [HttpPost("Register")]
-        public async Task<IActionResult> Register(RegisterRequest request)
+        [Consumes("application/json")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
             if (_db.Users.Any(u => u.Email == request.Email))
                 return BadRequest("User already exists");
@@ -37,7 +49,10 @@ namespace TimeTrackerAPI.Controllers
         }
 
         [HttpPost("Login")]
-        public async Task<IActionResult> Login(LoginRequest request)
+        [Consumes("application/json")]
+        [ProducesResponseType(typeof(TokenResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
             var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
 
@@ -47,16 +62,26 @@ namespace TimeTrackerAPI.Controllers
             if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
                 return Unauthorized("Invalid email or password");
 
-            await _db.SaveChangesAsync();
-
             var tokens = await _jwt.IssueTokens(user);
             return Ok(tokens);
         }
 
         [HttpPost("Google")]
-        public async Task<IActionResult> GoogleLogin(GoogleLoginRequest request)
+        [Consumes("application/json")]
+        [ProducesResponseType(typeof(TokenResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequest request)
         {
-            var payload = await GoogleJsonWebSignature.ValidateAsync(request.Credential);
+            GoogleJsonWebSignature.Payload payload;
+
+            try
+            {
+                payload = await GoogleJsonWebSignature.ValidateAsync(request.Credential);
+            }
+            catch
+            {
+                return BadRequest("Invalid Google credential");
+            }
 
             var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == payload.Email);
 
@@ -69,6 +94,7 @@ namespace TimeTrackerAPI.Controllers
                     Provider = "google",
                     ProviderId = payload.Subject
                 };
+
                 _db.Users.Add(user);
                 await _db.SaveChangesAsync();
             }
@@ -79,7 +105,9 @@ namespace TimeTrackerAPI.Controllers
 
 
         [HttpPost("Logout")]
-        public async Task<IActionResult> Logout(LogoutRequest request)
+        [Consumes("application/json")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public async Task<IActionResult> Logout([FromBody] LogoutRequest request)
         {
             var token = await _db.RefreshTokens
                 .FirstOrDefaultAsync(t => t.Token == request.RefreshToken);

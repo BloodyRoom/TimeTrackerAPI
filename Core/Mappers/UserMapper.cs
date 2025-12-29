@@ -14,7 +14,7 @@ public class UserMapper : Profile
         CreateMap<RegisterRequest, UserEntity>()
             .ForMember(x => x.PasswordHash, opt => opt.Ignore());
 
-        CreateMap<UserEntity, UserModel>();
+        CreateMap<UserEntity, UserDTO>();
 
     }
 }

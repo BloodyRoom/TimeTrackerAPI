@@ -9,24 +9,29 @@ using Microsoft.EntityFrameworkCore;
 namespace TimeTrackerAPI.Controllers;
 
 [Authorize]
-[Route("api/[controller]")]
 [ApiController]
+[Tags("Sessions")]
+[Route("api/[controller]")]
 public class SessionController(
     TrackerDBContext _db) : ControllerBase
 {
     [HttpGet]
+    [ProducesResponseType(typeof(TimeSessionEntity), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Get()
     {
         int userId = User.GetUserId();
 
         var active = await _db.TimeSessions
-            .FirstOrDefaultAsync(s => s.UserId == userId &&
+            .FirstOrDefaultAsync(s =>
+                s.UserId == userId &&
                 (s.Status == SessionStatus.Active || s.Status == SessionStatus.Paused));
 
         return Ok(active);
     }
 
     [HttpGet("Statistic/Day")]
+    [ProducesResponseType(typeof(TimeStatisticResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> Day()
     {
         int userId = User.GetUserId();
@@ -38,6 +43,7 @@ public class SessionController(
     }
 
     [HttpGet("Statistic/Week")]
+    [ProducesResponseType(typeof(TimeStatisticResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> Week()
     {
         int userId = User.GetUserId();
@@ -49,51 +55,41 @@ public class SessionController(
     }
 
     [HttpGet("Statistic/Month")]
+    [ProducesResponseType(typeof(TimeStatisticResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> Month()
     {
         int userId = User.GetUserId();
         var now = DateTime.UtcNow;
 
-        var from = new DateTime(
-            now.Year,
-            now.Month,
-            1,
-            0, 0, 0,
-            DateTimeKind.Utc);
-
+        var from = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
         var to = from.AddMonths(1);
 
         return Ok(await GetStatistic(userId, from, to, false));
     }
 
     [HttpGet("Statistic/Year")]
+    [ProducesResponseType(typeof(TimeStatisticResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> Year()
     {
         int userId = User.GetUserId();
         var now = DateTime.UtcNow;
 
-        var from = new DateTime(
-            now.Year,
-            1,
-            1,
-            0, 0, 0,
-            DateTimeKind.Utc);
-
+        var from = new DateTime(now.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var to = from.AddYears(1);
 
         return Ok(await GetStatistic(userId, from, to, true));
     }
 
-
-
     [HttpPost("Start")]
+    [ProducesResponseType(typeof(TimeSessionEntity), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Start()
     {
         int userId = User.GetUserId();
 
-        var user = await _db.Users.FindAsync(userId);
         var active = await _db.TimeSessions
-            .FirstOrDefaultAsync(s => s.UserId == userId &&
+            .FirstOrDefaultAsync(s =>
+                s.UserId == userId &&
                 (s.Status == SessionStatus.Active || s.Status == SessionStatus.Paused));
 
         if (active != null)
@@ -101,7 +97,7 @@ public class SessionController(
 
         var session = new TimeSessionEntity
         {
-            User = user ?? new UserEntity(),
+            UserId = userId,
             StartTime = DateTime.UtcNow,
             LastResumeTime = DateTime.UtcNow,
             Status = SessionStatus.Active,
@@ -115,6 +111,8 @@ public class SessionController(
     }
 
     [HttpPost("Pause")]
+    [ProducesResponseType(typeof(TimeSessionEntity), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Pause()
     {
         int userId = User.GetUserId();
@@ -127,7 +125,8 @@ public class SessionController(
 
         var now = DateTime.UtcNow;
 
-        session.DurationSeconds += (int)(now - session.LastResumeTime!.Value).TotalSeconds;
+        session.DurationSeconds +=
+            (int)(now - session.LastResumeTime!.Value).TotalSeconds;
 
         session.LastResumeTime = null;
         session.Status = SessionStatus.Paused;
@@ -138,6 +137,8 @@ public class SessionController(
     }
 
     [HttpPost("Resume")]
+    [ProducesResponseType(typeof(TimeSessionEntity), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Resume()
     {
         int userId = User.GetUserId();
@@ -157,12 +158,15 @@ public class SessionController(
     }
 
     [HttpPost("Stop")]
+    [ProducesResponseType(typeof(TimeSessionEntity), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Stop()
     {
         int userId = User.GetUserId();
 
         var session = await _db.TimeSessions
-            .FirstOrDefaultAsync(s => s.UserId == userId &&
+            .FirstOrDefaultAsync(s =>
+                s.UserId == userId &&
                 (s.Status == SessionStatus.Active || s.Status == SessionStatus.Paused));
 
         if (session == null)
@@ -172,7 +176,8 @@ public class SessionController(
 
         if (session.Status == SessionStatus.Active)
         {
-            session.DurationSeconds += (int)(now - session.LastResumeTime!.Value).TotalSeconds;
+            session.DurationSeconds +=
+                (int)(now - session.LastResumeTime!.Value).TotalSeconds;
         }
 
         session.EndTime = now;
@@ -210,7 +215,7 @@ public class SessionController(
                     1,
                     0, 0, 0,
                     DateTimeKind.Utc))
-                .Select(g => new TimeStatisticItem
+                .Select(g => new TimeStatisticDTO
                 {
                     Date = g.Key,
                     TotalSeconds = g.Sum(x => x.DurationSeconds)
@@ -219,7 +224,7 @@ public class SessionController(
                 .ToList()
             : sessions
                 .GroupBy(s => s.EndTime!.Value.Date)
-                .Select(g => new TimeStatisticItem
+                .Select(g => new TimeStatisticDTO
                 {
                     Date = DateTime.SpecifyKind(g.Key, DateTimeKind.Utc),
                     TotalSeconds = g.Sum(x => x.DurationSeconds)
@@ -227,7 +232,7 @@ public class SessionController(
                 .OrderBy(x => x.Date)
                 .ToList();
 
-        return new TimeStatisticResponse    
+        return new TimeStatisticResponse
         {
             TotalSeconds = sessions.Sum(s => s.DurationSeconds),
             SessionsCount = sessions.Count,

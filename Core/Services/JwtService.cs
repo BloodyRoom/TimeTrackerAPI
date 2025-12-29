@@ -19,7 +19,7 @@ public class JwtService(
 {
     private readonly string _key = configuration["Jwt:Key"] ?? "";
 
-    public string CreateAccessToken(UserModel user)
+    public string CreateAccessToken(UserDTO user)
     {
         var claims = new[]
         {
@@ -49,7 +49,7 @@ public class JwtService(
 
     public async Task<object> IssueTokens(UserEntity user)
     {
-        var accessToken = CreateAccessToken(_mapper.Map<UserModel>(user));
+        var accessToken = CreateAccessToken(_mapper.Map<UserDTO>(user));
 
         var refresh = new RefreshTokenEntity
         {

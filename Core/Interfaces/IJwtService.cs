@@ -5,7 +5,7 @@ namespace Core.Interfaces;
 
 public interface IJwtService
 {
-    string CreateAccessToken(UserModel user);
+    string CreateAccessToken(UserDTO user);
     string CreateRefreshToken();
     Task<object> IssueTokens(UserEntity user);
 }
