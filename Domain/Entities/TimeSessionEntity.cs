@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Text;
 
 namespace Domain.Entities;
@@ -14,8 +15,9 @@ public enum SessionStatus
 
 public class TimeSessionEntity : BaseEntity<int>
 {
+    [ForeignKey(nameof(User))]
     public int UserId { get; set; }
-    public UserEntity User { get; set; } = new UserEntity(); 
+    public UserEntity User { get; set; } = null!;
 
     public DateTime StartTime { get; set; }
     public DateTime? EndTime { get; set; }
